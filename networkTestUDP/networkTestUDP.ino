@@ -5,8 +5,6 @@ EDIT BY VEMA REDDY
 
 
 */
-
-
 // Needed Library
 #include <SPI.h>         // needed for Arduino versions later than 0018
 #include <Ethernet.h>
