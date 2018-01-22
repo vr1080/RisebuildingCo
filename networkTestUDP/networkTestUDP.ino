@@ -2,8 +2,8 @@
 RFID PROJECT
 BY TODD CARPER
 EDIT BY VEMA REDDY
-
 */
+
 // Needed Library
 #include <SPI.h>         // needed for Arduino versions later than 0018
 #include <Ethernet.h>
@@ -58,15 +58,14 @@ char sendingBuffer[100];
 IPAddress remoteServerIP;
 
 /*
-
   MEGA  RFID
   RST/REST 5
   SPI SS 53
   SPI MOSI 51
   SPI MISO  50
   SPI CSK 52
-
 */
+
 // for the RFID Reader
 #define RST_PIN 5
 #define SS_PIN 53
@@ -90,7 +89,8 @@ constexpr uint8_t DOOR_LATCH = 7;
 constexpr uint8_t RELAY_LATCH = 7;
 
 
-/*  MEGA OLED
+/*  
+  MEGA OLED
   GND GND
   5V
   SCL (CLK of SPI) D13
@@ -98,7 +98,6 @@ constexpr uint8_t RELAY_LATCH = 7;
   Reset D9
   DC D8
   CD D10
-
 */
 
 #define sclk 13
@@ -579,7 +578,7 @@ void readyMessage(int delaySeconds) {
     #endif
   }
 
-  // These read 16- and 32-bit types from the SD card file.
+  // These read 16 - and 32-bit types from the SD card file.
   // BMP data is stored little-endian, Arduino is little-endian too.
   // May need to reverse subscript order if porting elsewhere.
 
