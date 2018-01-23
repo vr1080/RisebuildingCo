@@ -39,6 +39,7 @@ GLOBAL VARIABLES *******************************************************
 // MAC Address
 byte mac[6] = { 0x90, 0xA2, 0xDA, 0x00, 0x00, 0x00 };
 
+//interface for webpage
 StaticJsonBuffer<256> jsonBuffer;
 // StaticJsonBuffer<256> jsonBuffer2;
 
@@ -49,6 +50,7 @@ unsigned int SERVERPORT = 4545;
 unsigned int MODULEPORT = 4546;
 
 // buffers for receiving and sending data
+//ethernet
 char packetBuffer[UDP_TX_PACKET_MAX_SIZE];  //buffer to hold incoming packet,
 
 // An EthernetUDP instance to let us send and receive packets over UDP
@@ -58,6 +60,8 @@ char sendingBuffer[100];
 IPAddress remoteServerIP;
 
 /*
+ //RFID pin layout
+ 
   MEGA  RFID
   RST/REST 5
   SPI SS 53
@@ -73,10 +77,10 @@ MFRC522 mfrc522(SS_PIN, RST_PIN);  // Create MFRC522 instance
 
 #define DEBUG 0
 
+//macros (program before you compile)
 #if DEBUG == 1
 byte    ourUID[10];
 #endif
-
 char    macstr[18];
 
 int moduleType = 2;
@@ -90,6 +94,8 @@ constexpr uint8_t RELAY_LATCH = 7;
 
 
 /*  
+  //LCD Display
+  
   MEGA OLED
   GND GND
   5V
@@ -106,11 +112,12 @@ constexpr uint8_t RELAY_LATCH = 7;
 #define rst  9
 #define dc   8
 
+//code for display
 Adafruit_SSD1331 display = Adafruit_SSD1331 (cs, dc, mosi, sclk, rst); // (cs, dc, rst); 
 //*********************************************************************************************
 void setup() {
  // pinMode(cs, OUTPUT);
-  // Store MAC address in EEPROM or read it back
+  // Store MAC address in EEPROM or read it back //random Mac address
   if (EEPROM.read(1) == '#') {
     for (int i = 3; i < 6; i++) {
       mac[i] = EEPROM.read(i);
@@ -129,17 +136,17 @@ void setup() {
   Udp.begin(LOCALPORT);
 
   SPI.begin();      // Init SPI bus
-  mfrc522.PCD_Init();   // Init MFRC522
+  mfrc522.PCD_Init();   // Init MFRC522 RFID
 
+//if your good
 #if DEBUG == 1
   Serial.begin(9600);
   Serial.println("Starting");
   Serial.println(macstr);
-  mfrc522.PCD_DumpVersionToSerial();  // Show details of PCD - MFRC522 Card Reader details
+  mfrc522.PCD_DumpVersionToSerial();  // Show details of PCD - MFRC522 Card Reader details //??send image file to serial port
 #endif
-
   display.begin();
-  display.fillScreen(WHITE);
+  display.fillScreen(WHITE); //fill the screen white
   
   switch (moduleType) {
     case DOOR:
@@ -150,6 +157,8 @@ void setup() {
   }
 }
 //*************************************************************************************
+//initalize print hex function if successfully connected
+//format for serial console
 #if DEBUG == 1
 void printHex(byte *buffer, byte bufferSize) {
   for (byte i = 0; i < bufferSize; i++) {
@@ -164,11 +173,14 @@ void loop() {
   // if there's data available, read a packet
   int packetSize = Udp.parsePacket();
   if (packetSize) {
-    remoteServerIP = Udp.remoteIP();
+    remoteServerIP = Udp.remoteIP(); //ask for ip
     Udp.read(packetBuffer, UDP_TX_PACKET_MAX_SIZE);
     packetBuffer[packetSize] = 0;
+    //read and store in buffer
 
 #if DEBUG == 1
+//print ip address of serial port
+//verify what is being sent
     for (int i = 0; i < 4; i++) {
       Serial.print(remoteServerIP[i], DEC);
       if (i < 3) {
@@ -180,7 +192,7 @@ void loop() {
     Serial.println("Contents:");
     Serial.println(packetBuffer);
 #endif
-    
+    //going to a webpage
     JsonObject& jsonItem = jsonBuffer.parseObject(packetBuffer);
 
     if (! registered) {
@@ -194,8 +206,9 @@ void loop() {
 
         msgToServer.printTo(sendingBuffer, sizeof(sendingBuffer));  // get the JSON string
         #if DEBUG == 1
-          Serial.println(sendingBuffer);
+          Serial.println(sendingBuffer); //Send to serial port when in debug mode
        #endif
+       //send buffer through ethernet
         Udp.beginPacket(remoteServerIP, SERVERPORT);
         Udp.write(sendingBuffer);
         Udp.endPacket();
@@ -203,7 +216,8 @@ void loop() {
 
         Udp.begin(MODULEPORT);  // switch away from the IP broadcast port
 
-        readyMessage(10);
+        readyMessage(10); //delays
+        
         /*
            http://arduinojson.org/doc/encoding/
 
@@ -217,13 +231,14 @@ void loop() {
       // we already have the server IP, so this should be a command coming in - deal with it
       if (jsonItem.containsKey("DIRECTIVE")) {
 
-        String ack = jsonItem["DIRECTIVE"];
+        String ack = jsonItem["DIRECTIVE"]; //going to webserver //look at server code
 
         if (ack == "OK") {
-          String configString = jsonItem["Configuration"];
+          String configString = jsonItem["Configuration"]; //look at server code
           
           JsonObject& jsonConfig = jsonBuffer.parseObject(configString);
 
+//RFID options (door,locker,reader, etc...)
           switch (moduleType) {
             case READER: {
 
@@ -233,6 +248,7 @@ void loop() {
             case LOCKER:
             case DOOR: {
 
+//Going to server
                 String operation = jsonConfig["Operation"];
                 String fullName = jsonItem["Name"];
                 String jsonImage = jsonItem["Image"];
@@ -240,6 +256,7 @@ void loop() {
 
                 display.fillScreen(WHITE);
 
+//printing Name and info
                 if (fullName != "") {
                   display.setTextSize(1);
                   display.setTextColor(BLUE);
@@ -249,16 +266,16 @@ void loop() {
                 
                 if (imageLen > 10) {
                   uint8_t theImageArray[imageLen];
-                  jsonImage.getBytes(theImageArray, imageLen);
+                  jsonImage.getBytes(theImageArray, imageLen); //pulling Image
 
                   imageLen = rbase64_dec_len(theImageArray, imageLen);
 
                   String decodedImage = rbase64.decode(theImageArray, imageLen );
                   uint8_t theImage[imageLen];
-                  decodedImage.getBytes(theImage, imageLen);
-                  bmpDraw(theImage, 40, 40);
+                  decodedImage.getBytes(theImage, imageLen); 
+                  bmpDraw(theImage, 40, 40); //draw image
                 }
-
+//give you 5 seconds to open door
                 if (operation == "OPEN") {
                   digitalWrite(DOOR_LATCH, HIGH);
                   delay(5000);
@@ -269,20 +286,22 @@ void loop() {
                 readyMessage(2000);
               }
               break;
+              
 
             case RELAY: {
                 String operation = jsonConfig["Operation"];
                 if (operation == "ON") {
-                  digitalWrite(RELAY_LATCH, HIGH);
+                  digitalWrite(RELAY_LATCH, HIGH); //pulls pin high
                 }
                 else {
                   digitalWrite(RELAY_LATCH, LOW);
                 }
               }
               break;
-
+              
+//LED on the board or webpage
             case RGBLED: {
-                String operation = jsonConfig["Operation"];
+                String operation = jsonConfig["Operation"]; //something to webpage
                 String color = jsonConfig["Color"];
                 if (operation == "ON") {
                   digitalWrite(RELAY_LATCH, HIGH);
@@ -332,6 +351,7 @@ void loop() {
   } else {  // no packet data so...
     // Look for new cards and send the RFID to the server - the server will decide what to do
 
+
     if ( ! mfrc522.PICC_IsNewCardPresent()) {
       return;
     }
@@ -346,11 +366,11 @@ void loop() {
 
     String ourUIDString = "";
     for (byte i = 0; i < mfrc522.uid.size; i++) {
-      ourUIDString += mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " ";
+      ourUIDString += mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " "; //if end statement ??????
       ourUIDString += String(mfrc522.uid.uidByte[i], HEX);
 
 #if DEBUG == 1
-      ourUID[i] = mfrc522.uid.uidByte[i];
+      ourUID[i] = mfrc522.uid.uidByte[i]; //user defined strings
 #endif
 
     }
@@ -368,12 +388,13 @@ void loop() {
     JsonObject& msgToServer = jsonBuffer.createObject();
     msgToServer["COMMAND"] = "REQUEST";
     msgToServer["MODULEID"] = macstr;
-    msgToServer["RFID"] = ourUIDString;
+    msgToServer["RFID"] = ourUIDString; //this RFID number is now being sent
 
-    msgToServer.printTo(sendingBuffer, sizeof(sendingBuffer));  // get the JSON string
+    msgToServer.printTo(sendingBuffer, sizeof(sendingBuffer));  // get the JSON string //send buffer to server
  #if DEBUG == 1
     Serial.println(sendingBuffer);
  #endif
+ //send packet through ethernet port
     Udp.beginPacket(remoteServerIP, SERVERPORT);
     Udp.write(sendingBuffer);
     Udp.endPacket();
@@ -381,7 +402,7 @@ void loop() {
   } // look at rfid
 }
 //##########################################################################################
-//
+//LCD
 void centerMessage(String message, int color, int textSize ) {
   // with textSize == 1
  // we have 16 capital chars across   6 pixels wide / character   96 total
@@ -454,7 +475,7 @@ void readyMessage(int delaySeconds) {
 
 #define BUFFPIXEL 20
 
-//
+//manipulate LCD screen
   void bmpDraw(uint8_t image[], uint8_t x, uint8_t y) {
 
     int      bmpWidth, bmpHeight;   // W+H in pixels
@@ -498,7 +519,7 @@ void readyMessage(int delaySeconds) {
         offset += 2;
         bmpDepth = read16(image, offset); // bits per pixel
         offset += 2;
-        #if DBEUG == 1
+        #if DBEUG == 1 // ????????????????????????????????????????????????????????/
         Serial.print("Bit Depth: "); Serial.println(bmpDepth);
         #endif
         if ((bmpDepth == 24) && (read32(image, offset) == 0)) { // 0 = uncompressed
@@ -577,7 +598,7 @@ void readyMessage(int delaySeconds) {
       if (!goodBmp) Serial.println("BMP format not recognized.");
     #endif
   }
-
+  //save images on mega2560
   // These read 16 - and 32-bit types from the SD card file.
   // BMP data is stored little-endian, Arduino is little-endian too.
   // May need to reverse subscript order if porting elsewhere.
